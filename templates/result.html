@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET | Classified Result</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script defer src="{{ url_for('static', filename='js/reveal.js') }}"></script>
+</head>
+<body>
+
+<div class="card" style="text-align:center;">
+
+    <h2>⚠ CLASSIFIED DATA RECOVERED</h2>
+    <p class="subtitle">Decrypting Intelligence Payload...</p>
+
+    <div id="typewriter" 
+         data-text="{{secret}}"
+         style="margin-top:30px; font-size:18px; min-height:60px;">
+    </div>
+
+    <br><br>
+
+    <a href="{{ url_for('dashboard') }}" class="btn">
+        Return to Dashboard
+    </a>
+
+</div>
+
+</body>
+</html>

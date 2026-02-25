@@ -1,0 +1,8 @@
+Flask
+Flask-Login
+Werkzeug
+Pillow
+Flask-Mail
+Flask-SQLAlchemy
+Flask-Bcrypt
+gunicorn

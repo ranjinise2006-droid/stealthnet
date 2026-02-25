@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET | Embed Secret</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="card">
+
+    <h2>🛰 Stealth Image Encoder</h2>
+    <p class="subtitle">Embed classified data inside an image</p>
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <!-- Image Upload -->
+        <label>Select Cover Image</label>
+        <input type="file" name="image" accept="image/*" required>
+
+        <br><br>
+
+        <!-- Secret Message -->
+        <label>Secret Message</label>
+        <textarea 
+            name="secret" 
+            placeholder="Enter confidential message..."
+            rows="4"
+            required></textarea>
+
+        <br><br>
+
+        <!-- Password -->
+        <label>Extraction Password</label>
+        <input 
+            type="password" 
+            name="password" 
+            placeholder="Minimum 6 characters with special symbol"
+            required>
+
+        <br><br>
+
+        <button type="submit" class="btn">
+            Generate Secure Image
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

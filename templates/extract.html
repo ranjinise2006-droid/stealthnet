@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET | Extract</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="card">
+
+    <h2>🔎 Secure Message Extraction</h2>
+    <p class="subtitle">Upload encoded image to retrieve classified data</p>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div style="color:red; margin-bottom:15px;">
+          {{ messages[0] }}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data" autocomplete="off">
+
+        <label>Select Encoded Image</label>
+        <input type="file" name="image" accept="image/png" required>
+
+        <br><br>
+
+        <label>Extraction Password</label>
+        <input type="password" name="password" autocomplete="new-password" required>
+
+        <br><br>
+
+        <button type="submit" class="btn">
+            Extract Secret Message
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

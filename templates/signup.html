@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET // Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="card">
+    <h2>🔐 Agent Registration</h2>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div style="color:red; margin-bottom:15px;">
+          {{ messages[0] }}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+
+        <label>Agent ID</label>
+        <input type="text" name="username" required>
+
+        <br><br>
+
+        <label>Secure Email</label>
+        <input type="email" name="email" required>
+
+        <br><br>
+
+        <label>Access Key</label>
+        <input type="password" name="password" required>
+
+        <br><br>
+
+        <button type="submit" class="btn">REGISTER AGENT</button>
+
+    </form>
+
+    <p style="margin-top:20px; font-size:12px; text-align:center;">
+        Already registered? 
+        <a href="{{ url_for('login') }}" style="color:#00ffee;">Login</a>
+    </p>
+
+</div>
+
+</body>
+</html>

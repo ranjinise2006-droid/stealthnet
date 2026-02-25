@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Encoded Image Generated</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<div class="card">
+
+    <h2>✶ Classified Image Generated</h2>
+    <p>Verify your encoded image before proceeding.</p>
+
+    <img src="{{ url_for('static', filename='encoded/' + image_file) }}"
+         style="max-width:400px; border:2px solid cyan;">
+
+    <br><br>
+
+    <!-- DOWNLOAD -->
+    <a href="{{ url_for('static', filename='encoded/' + image_file) }}" download>
+        <button class="btn">Download Image</button>
+    </a>
+
+    <br><br>
+
+    <!-- SHARE -->
+    <button class="btn" onclick="openEmailModal()">
+        Share to Email
+    </button>
+
+    <br><br>
+
+    <!-- PROCEED -->
+    <button class="btn" onclick="window.location.href='/extract'">
+        Proceed to Extraction
+    </button>
+
+</div>
+
+<!-- ================= EMAIL MODAL ================= -->
+
+<div id="emailModal" class="modal">
+    <div class="modal-content">
+        <h3>Secure Transmission</h3>
+
+        <form id="emailForm">
+
+            <input type="hidden" name="image_file" value="{{ image_file }}">
+
+            <input type="email"
+                   name="recipient"
+                   placeholder="Enter recipient email"
+                   required>
+
+            <br><br>
+
+            <button type="submit" class="btn">
+                Send Securely
+            </button>
+
+            <button type="button"
+                    class="btn"
+                    onclick="closeEmailModal()">
+                Cancel
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ================= SUCCESS MODAL ================= -->
+
+<div id="successModal" class="modal">
+    <div class="modal-content">
+        <h3>✅ Transmission Successful</h3>
+        <p>Email Sent Successfully!</p>
+
+        <button class="btn" onclick="closeSuccessModal()">
+            OK
+        </button>
+    </div>
+</div>
+
+<!-- ================= JAVASCRIPT ================= -->
+
+<script>
+
+function openEmailModal() {
+    document.getElementById("emailModal").style.display = "flex";
+}
+
+function closeEmailModal() {
+    document.getElementById("emailModal").style.display = "none";
+}
+
+function openSuccessModal() {
+    document.getElementById("successModal").style.display = "flex";
+}
+
+function closeSuccessModal() {
+    document.getElementById("successModal").style.display = "none";
+}
+
+document.getElementById("emailForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    let formData = new FormData(this);
+
+    fetch("/share-email", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "success") {
+            closeEmailModal();
+            openSuccessModal();
+        }
+    });
+});
+
+</script>
+
+</body>
+</html>

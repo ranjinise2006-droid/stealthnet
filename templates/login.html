@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET // Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="card">
+    <h2>🔐 Secure Authentication</h2>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div style="color:navy; margin-bottom:15px;">
+          {{ messages[0] }}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <label>Agent ID</label>
+        <input type="text" name="username" required>
+
+        <br><br>
+
+        <label>Access Key</label>
+        <input type="password" name="password" required>
+
+        <br><br>
+
+        <button type="submit" class="btn">AUTHORIZE ACCESS</button>
+    </form>
+
+    <p style="margin-top:20px; font-size:12px; opacity:0.7; text-align:center;">
+        STEALTHNET Intelligence Division
+    </p>
+</div>
+
+</body>
+</html>

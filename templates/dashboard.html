@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET // Command Center</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .dashboard-grid {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-top: 100px;
+        }
+
+        .card {
+            padding: 40px;
+            width: 250px;
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #00ffcc;
+            border-radius: 10px;
+            box-shadow: 0 0 20px #00ffcc;
+            transition: 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 40px #00ffcc;
+        }
+
+        a {
+            text-decoration: none;
+            color: #00ffcc;
+        }
+
+        .logout {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<a class="logout" href="{{ url_for('logout') }}">LOGOUT</a>
+
+<h1 style="text-align:center; margin-top:50px;">
+    🛰 STEALTHNET COMMAND CENTER
+</h1>
+
+<div class="dashboard-grid">
+    <a href="{{ url_for('embed') }}">
+        <div class="card">
+            <h3>🖼 Embed Secret</h3>
+            <p>Hide classified message inside image</p>
+        </div>
+    </a>
+
+    <a href="{{ url_for('extract') }}">
+        <div class="card">
+            <h3>🔍 Extract Secret</h3>
+            <p>Recover hidden intelligence data</p>
+        </div>
+    </a>
+</div>
+
+</body>
+</html>

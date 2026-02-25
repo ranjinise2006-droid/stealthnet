@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STEALTHNET // Secure Entry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        .warning-box {
+            padding: 50px;
+            border: 2px solid #ff004c;
+            box-shadow: 0 0 30px #ff004c;
+            background: rgba(0,0,0,0.7);
+            animation: pulse 2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 0 0 10px #ff004c; }
+            to { box-shadow: 0 0 40px #ff004c; }
+        }
+
+        h1 {
+            color: #ff004c;
+            letter-spacing: 3px;
+        }
+
+        .enter-btn {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="warning-box">
+    <h1>⚠ CLASSIFIED SYSTEM ⚠</h1>
+    <p>Unauthorized access is strictly prohibited.</p>
+    <p>All activity is monitored and logged.</p>
+
+    <div class="enter-btn">
+        <a href="{{ url_for('signup') }}"class="btn">
+            ENTER SECURE TERMINAL
+        </a>
+    </div>
+</div>
+
+</body>
+</html>
