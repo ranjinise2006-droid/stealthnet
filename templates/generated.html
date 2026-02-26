@@ -115,7 +115,13 @@ document.getElementById("emailForm").addEventListener("submit", function(e) {
         if (data.status === "success") {
             closeEmailModal();
             openSuccessModal();
+        } else {
+            alert("Email failed: " + data.message);
         }
+    })
+    .catch(error => {
+        alert("Server error occurred.");
+        console.error(error);
     });
 });
 

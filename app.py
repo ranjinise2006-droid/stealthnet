@@ -279,22 +279,26 @@ def logout():
 @login_required
 def share_email():
     try:
-        recipient = request.form.get("email")
-        filename = request.form.get("filename")
+        recipient = request.form.get("recipient")
+        filename = request.form.get("image_file")
 
-        image_url = f"https://stealthnet.onrender.com/static/generated/{filename}"
+        print("Recipient:", recipient)
+        print("Filename:", filename)
+
+        if not recipient or not filename:
+            return jsonify({"status": "error", "message": "Missing form data"}), 400
+
+        image_url = f"https://stealthnet.onrender.com/static/encoded/{filename}"
 
         msg = Message(
             subject="StealthNet Classified Image",
             recipients=[recipient],
             body=f"""
-A classified image has been shared with you.
+A classified image has been securely transmitted.
 
-Click below to view:
+Access it here:
 
 {image_url}
-
-Use your secret code to extract the hidden message.
 
 -- STEALTHNET
 """
@@ -302,11 +306,12 @@ Use your secret code to extract the hidden message.
 
         mail.send(msg)
 
-        return jsonify({"success": True})
+        return jsonify({"status": "success"})
 
     except Exception as e:
         print("Email Error:", e)
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
 # ==============================
 # MAIN
 # ==============================
