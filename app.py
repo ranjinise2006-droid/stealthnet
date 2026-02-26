@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file,jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
@@ -278,25 +278,36 @@ def logout():
 @app.route("/share-email", methods=["POST"])
 @login_required
 def share_email():
+    try:
+        data = request.get_json()
+        recipient = data.get("email")
+        filename = data.get("filename")
 
-    recipient = request.form.get("recipient")
-    image_file = request.form.get("image_file")
+        image_url = f"https://stealthnet.onrender.com/static/generated/{filename}"
 
-    image_path = os.path.join("static", "encoded", image_file)
+        msg = Message(
+            subject="StealthNet Classified Image",
+            recipients=[recipient],
+            body=f"""
+A classified image has been shared with you.
 
-    msg = Message(
-        subject="StealthNet Secure Image",
-        recipients=[recipient],
-        body="A classified encoded image has been shared with you."
-    )
+Click below to view:
 
-    with open(image_path, "rb") as f:
-        msg.attach(image_file, "image/png", f.read())
+{image_url}
 
-    mail.send(msg)
+Use your secret code to extract the hidden message.
 
-    return {"status": "success"}
+-- STEALTHNET
+"""
+        )
 
+        mail.send(msg)
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("Email Error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
 # ==============================
 # MAIN
 # ==============================
