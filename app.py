@@ -286,31 +286,34 @@ def share_email():
         print("Filename:", filename)
 
         if not recipient or not filename:
-            return jsonify({"status": "error", "message": "Missing form data"}), 400
+            return jsonify({"status": "error", "message": "Missing data"}), 400
 
         image_url = f"https://stealthnet.onrender.com/static/encoded/{filename}"
 
         msg = Message(
             subject="StealthNet Classified Image",
-            recipients=[recipient],
-            body=f"""
-A classified image has been securely transmitted.
-
-Access it here:
-
-{image_url}
-
--- STEALTHNET
-"""
+            recipients=[recipient]
         )
 
-        mail.send(msg)
+        msg.body = f"""
+STEALTHNET SECURE TRANSMISSION
 
-        return jsonify({"status": "success"})
+Access your encoded image:
+{image_url}
+
+Use your secret key to extract the hidden message.
+"""
+
+        try:
+            mail.send(msg)
+            return jsonify({"status": "success"})
+        except Exception as mail_error:
+            print("Mail sending failed:", mail_error)
+            return jsonify({"status": "error", "message": "Mail failed"}), 500
 
     except Exception as e:
-        print("Email Error:", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print("Route crashed:", e)
+        return jsonify({"status": "error", "message": "Server error"}), 500
     
 # ==============================
 # MAIN
