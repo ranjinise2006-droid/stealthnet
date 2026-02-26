@@ -279,9 +279,8 @@ def logout():
 @login_required
 def share_email():
     try:
-        data = request.get_json()
-        recipient = data.get("email")
-        filename = data.get("filename")
+        recipient = request.form.get("email")
+        filename = request.form.get("filename")
 
         image_url = f"https://stealthnet.onrender.com/static/generated/{filename}"
 
