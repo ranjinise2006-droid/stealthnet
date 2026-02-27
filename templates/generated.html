@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Encoded Image Generated</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+{% extends "base.html" %}
 
-<body>
+{% block title %}Encoded Image Generated{% endblock %}
+
+{% block content %}
 
 <div class="card">
 
@@ -127,5 +124,4 @@ document.getElementById("emailForm").addEventListener("submit", function(e) {
 
 </script>
 
-</body>
-</html>
+{% endblock %}

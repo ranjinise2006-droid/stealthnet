@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}STEALTHNET{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- Shared Background for All Pages Except Welcome -->
+<video autoplay muted loop playsinline class="bg-video">
+    <source src="{{ url_for('static', filename='videos/main-bg.mp4') }}" type="video/mp4">
+</video>
+
+{% block content %}{% endblock %}
+
+</body>
+</html>

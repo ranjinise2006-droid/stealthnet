@@ -1,11 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>STEALTHNET | Classified Result</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script defer src="{{ url_for('static', filename='js/reveal.js') }}"></script>
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}STEALTHNET | Classified Result{% endblock %}
+
+{% block content %}
+
+<!-- Load reveal.js only for this page -->
+<script defer src="{{ url_for('static', filename='js/reveal.js') }}"></script>
 
 <div class="card" style="text-align:center;">
 
@@ -13,7 +13,7 @@
     <p class="subtitle">Decrypting Intelligence Payload...</p>
 
     <div id="typewriter" 
-         data-text="{{secret}}"
+         data-text="{{ secret }}"
          style="margin-top:30px; font-size:18px; min-height:60px;">
     </div>
 
@@ -25,5 +25,4 @@
 
 </div>
 
-</body>
-</html>
+{% endblock %}

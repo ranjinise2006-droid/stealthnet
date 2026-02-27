@@ -5,6 +5,7 @@ from flask_bcrypt import Bcrypt
 from PIL import Image
 from werkzeug.utils import secure_filename
 from flask_mail import Mail,Message
+from sqlalchemy.exc import IntegrityError
 import os
 import re
 import datetime
@@ -142,40 +143,49 @@ def decode_image(image_path, password):
 @app.route("/")
 def welcome():
     return render_template("welcome.html")
-
 # -------- SIGNUP --------
-
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if request.method == "POST":
-        username = request.form["username"]
-        email = request.form["email"]
-        password = request.form["password"]
 
-        error = validate_password(password)
-        if error:
-            flash(error)
-            return redirect(url_for("signup"))
+ if request.method == "POST":
 
-        if User.query.filter_by(username=username).first():
-            flash("Username already exists")
-            return redirect(url_for("signup"))
+    username = request.form.get("username")
+    email = request.form.get("email")
+    password = request.form.get("password")
 
-        if User.query.filter_by(email=email).first():
-            flash("Email already registered")
-            return redirect(url_for("signup"))
+    error = validate_password(password)
+    if error:
+        flash(error)
+        return redirect(url_for("signup"))
 
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    if User.query.filter_by(username=username).first():
+        flash("Username already exists")
+        return redirect(url_for("signup"))
 
-        new_user = User(username=username, email=email, password=hashed_password)
+    if User.query.filter_by(email=email).first():
+        flash("Email already registered")
+        return redirect(url_for("signup"))
+
+    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+
+    new_user = User(
+        username=username,
+        email=email,
+        password=hashed_password
+    )
+
+    try:
         db.session.add(new_user)
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash("Email already exists")
+        return redirect(url_for("signup"))
 
-        flash("Account Created Successfully. Please Login.")
-        return redirect(url_for("login"))
+    flash("Account created successfully!")
+    return redirect(url_for("login"))
 
-    return render_template("signup.html")
-
+ return render_template("signup.html")
 # -------- LOGIN --------
 
 @app.route("/login", methods=["GET", "POST"])
