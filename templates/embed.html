@@ -29,11 +29,15 @@
 
         <!-- Password -->
         <label>Extraction Password</label>
-        <input 
-            type="password" 
-            name="password" 
-            placeholder="Minimum 6 characters with special symbol"
-            required>
+
+<div class="password-wrapper">
+    <input
+        type="password"
+        name="password"
+        placeholder="Minimum 6 characters with special symbol"
+        required>
+    <span class="toggle-password" onclick="togglePassword(this)">👁</span>
+</div>
 
         <br><br>
 

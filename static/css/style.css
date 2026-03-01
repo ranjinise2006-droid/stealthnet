@@ -3,7 +3,7 @@ html,body {
     color: #00ffee;
     margin: 0;
     padding: 0;
-    background:#020b1a !important;
+    background:transparent !important;
     overflow:auto;
 }
 
@@ -60,13 +60,15 @@ input, textarea {
 
 /* Button */
 .btn {
-    width: 100%;
+    width: fit-content;
     padding: 12px;
     background: transparent;
     border: 2px solid #00ffee;
     color: #00ffee;
     cursor: pointer;
     transition: 0.3s;
+    display: block;
+    margin: 20px auto 0;
 }
 
 .btn:hover {
@@ -175,4 +177,61 @@ input, textarea {
     right: 30px;
     color: #00ffcc;
     text-decoration: none;
+}
+.logs-btn {
+    position: absolute;
+    top: 20px;
+    left: 30px;
+    padding: 8px 14px;
+    font-size: 12px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #00ffcc;
+    border-radius: 6px;
+    color: #00ffcc;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.logs-btn:hover {
+    background: #00ffcc;
+    color: black;
+}
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper input {
+    width: 100%;
+    box-sizing: border-box;   /* IMPORTANT FIX */
+    padding-right: 40px;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #00f7ff;
+    font-size: 16px;
+}
+#typewriter {
+    max-width: 100%;
+    padding: 15px;
+    margin-top: 20px;
+
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+
+    white-space: pre-wrap;
+
+    max-height: 250px;
+    overflow-y: auto;
+
+    font-family: monospace;
+    text-align: left;
+    letter-spacing: 1px;
+    line-height: 1.6;
 }

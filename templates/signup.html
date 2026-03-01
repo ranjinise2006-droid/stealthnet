@@ -28,8 +28,10 @@
         <br><br>
 
         <label>Access Key</label>
-        <input type="password" name="password" required>
-
+        <div class="password-wrapper">
+    <input type="password" name="password" required>
+    <span class="toggle-password" onclick="togglePassword(this)">👁</span>
+</div>
         <br><br>
 
         <button type="submit" class="btn">REGISTER AGENT</button>

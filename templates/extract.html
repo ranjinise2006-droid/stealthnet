@@ -25,8 +25,14 @@
         <br><br>
 
         <label>Extraction Password</label>
-        <input type="password" name="password" autocomplete="new-password" required>
 
+<div class="password-wrapper">
+    <input type="password"
+           name="password"
+           autocomplete="new-password"
+           required>
+    <span class="toggle-password" onclick="togglePassword(this)">👁</span>
+</div>
         <br><br>
 
         <button type="submit" class="btn">

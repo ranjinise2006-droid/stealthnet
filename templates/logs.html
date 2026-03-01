@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}STEALTHNET // Activity Logs{% endblock %}
+
+{% block content %}
+
+<a class="logout" href="{{ url_for('dashboard') }}">⬅ Back</a>
+
+<h2 style="text-align:center; margin-top:40px;">
+    📜 User Activity Logs
+</h2>
+
+<div class="card" style="margin-top:40px; max-width:800px;">
+
+    {% for log in logs %}
+        <p>
+            👤 {{ log.user.username }}  
+            | {{ log.action }}  
+            | {{ log.timestamp }}
+        </p>
+        <hr style="opacity:0.2;">
+    {% endfor %}
+
+</div>
+
+{% endblock %}

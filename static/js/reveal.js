@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function type() {
         if (index < text.length) {
-            element.innerHTML += text.charAt(index);
+            element.textContent+= text.charAt(index);
             index++;
             setTimeout(type, 50);
         }

@@ -13,5 +13,13 @@
 
 {% block content %}{% endblock %}
 
+<!-- 🔐 Universal Password Toggle Script -->
+<script>
+function togglePassword(element) {
+    const input = element.previousElementSibling;
+    input.type = input.type === "password" ? "text" : "password";
+}
+</script>
+
 </body>
 </html>
