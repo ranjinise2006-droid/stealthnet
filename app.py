@@ -420,7 +420,10 @@ def share_email():
         if not recipient or not filename:
             return jsonify({"status": "error", "message": "Missing data"}), 400
 
-        image_url = f"http://127.0.0.1:5000/static/encoded/{filename}"
+        BASE_URL = "https://stealthnet.onrender.com"
+
+        # Public image link
+        image_url = f"{BASE_URL}/static/encoded/{filename}"
 
         msg = Message(
             subject="StealthNet Classified Image",
