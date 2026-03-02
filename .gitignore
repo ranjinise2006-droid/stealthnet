@@ -1,0 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Database
+*.db
+instance/
+
+# User uploaded files
+uploads/
+
+# Generated encoded images
+static/encoded/
+
+# System files
+.DS_Store
+Thumbs.db
