@@ -9,6 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
+import cloudinary
+import cloudinary.uploader
 import base64
 import os
 import re
@@ -24,11 +26,26 @@ app.secret_key = "SUPER_SECRET_CLASSIFIED_KEY"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stealthnet.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-UPLOAD_FOLDER = "uploads"
-ENCODED_FOLDER = "encoded"
+app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "uploads")
+app.config["ENCODED_FOLDER"] = os.path.join(app.root_path, "static", "encoded")
 
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["ENCODED_FOLDER"] = ENCODED_FOLDER
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+os.makedirs(app.config["ENCODED_FOLDER"], exist_ok=True)
+
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
+CLOUDINARY_FOLDER = os.environ.get("CLOUDINARY_FOLDER", "stealthnet")
+
+CLOUDINARY_ENABLED = all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET])
+
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
 
 # -------- MAIL CONFIG --------
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -81,6 +98,14 @@ def log_activity(user_id, action):
     log = ActivityLog(user_id=user_id, action=action)
     db.session.add(log)
     db.session.commit()
+
+def upload_encoded_image(file_path):
+    result = cloudinary.uploader.upload(
+        file_path,
+        folder=CLOUDINARY_FOLDER,
+        resource_type="image"
+    )
+    return result["secure_url"]
 
 # ==============================
 # AES ENCRYPTION FUNCTIONS
@@ -352,7 +377,7 @@ def embed():
             output_filename = "encoded_" + png_filename
 
             # Create output folder
-            output_folder = os.path.join("static", "encoded")
+            output_folder = app.config["ENCODED_FOLDER"]
             os.makedirs(output_folder, exist_ok=True)
 
             # Full output path
@@ -361,10 +386,24 @@ def embed():
             # Encode image
             encode_image(png_path, encrypted_secret, password, output_path)
 
+            image_url = url_for("static", filename=f"encoded/{output_filename}")
+            if CLOUDINARY_ENABLED:
+                try:
+                    image_url = upload_encoded_image(output_path)
+                except Exception as e:
+                    print("Cloudinary Error:", e)
+                    flash("Cloud upload failed. Using local copy.")
+            else:
+                flash("Cloudinary not configured. Using temporary local storage.")
+
             # Log activity
             log_activity(current_user.id, "Embed Secret")
 
-            return render_template("generated.html", image_file=output_filename)
+            return render_template(
+                "generated.html",
+                image_file=output_filename,
+                image_url=image_url
+            )
 
     return render_template("embed.html")
 # -------- EXTRACT --------
@@ -415,15 +454,20 @@ def logout():
 def share_email():
     try:
         recipient = request.form.get("recipient")
+        image_url = request.form.get("image_url")
         filename = request.form.get("image_file")
 
-        if not recipient or not filename:
+        if not recipient:
             return jsonify({"status": "error", "message": "Missing data"}), 400
 
-        BASE_URL = "https://stealthnet.onrender.com"
-
-        # Public image link
-        image_url = f"{BASE_URL}/static/encoded/{filename}"
+        if not image_url:
+            if not filename:
+                return jsonify({"status": "error", "message": "Missing image"}), 400
+            base_url = os.environ.get("BASE_URL", request.host_url.rstrip("/"))
+            image_url = f"{base_url}/static/encoded/{filename}"
+        elif image_url.startswith("/"):
+            base_url = os.environ.get("BASE_URL", request.host_url.rstrip("/"))
+            image_url = f"{base_url}{image_url}"
 
         msg = Message(
             subject="StealthNet Classified Image",

@@ -5,17 +5,18 @@
 {% block content %}
 
 <div class="card">
+    {% set display_url = image_url or url_for('static', filename='encoded/' + image_file) %}
 
     <h2>✶ Classified Image Generated</h2>
     <p>Verify your encoded image before proceeding.</p>
 
-    <img src="{{ url_for('static', filename='encoded/' + image_file) }}"
+    <img src="{{ display_url }}"
          style="max-width:400px; border:2px solid cyan;">
 
     <br><br>
 
     <!-- DOWNLOAD -->
-    <a href="{{ url_for('static', filename='encoded/' + image_file) }}" download>
+    <a href="{{ display_url }}" download>
         <button class="btn">Download Image</button>
     </a>
 
@@ -44,6 +45,7 @@
         <form id="emailForm">
 
             <input type="hidden" name="image_file" value="{{ image_file }}">
+            <input type="hidden" name="image_url" value="{{ display_url }}">
 
             <input type="email"
                    name="recipient"
