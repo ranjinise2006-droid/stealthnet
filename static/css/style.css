@@ -1,34 +1,47 @@
-html,body {
+html, body {
     font-family: 'Courier New', monospace;
     color: #00ffee;
     margin: 0;
     padding: 0;
-    background:transparent !important;
-    overflow:auto;
+    background: transparent !important;
+    overflow-x: hidden;
 }
 
-/* Center Container */
+/* ================= CARD ================= */
+
 .card {
-    width: 500px;
+    width: 90%;
+    max-width: 600px;
     margin: 80px auto;
-    padding: 40px;
+    padding: 40px 30px;
     background: rgba(0, 10, 25, 0.85);
     border: 2px solid #00ffee;
     border-radius: 10px;
     box-shadow: 0 0 25px #00ffee;
+
+    display: flex;
+    flex-direction: column;       
+    align-items: stretch;
+    justify-content: center;
+    min-height: 350px;
+
 }
+
+/* Warning Box */
+
 .warning-box {
-    position: relative;
-    width: 600px;
+    width: 90%;
+    max-width: 600px;
     margin: 150px auto;
     padding: 40px;
     text-align: center;
     background: rgba(0, 10, 25, 0.85);
     border: 2px solid #ff0040;
     box-shadow: 0 0 30px #ff0040;
-    z-index: 2;
 }
-/* Title */
+
+/* ================= TEXT ================= */
+
 h2 {
     text-align: center;
     margin-bottom: 10px;
@@ -38,53 +51,72 @@ h2 {
     text-align: center;
     font-size: 14px;
     color: #00ccaa;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
-/* Labels */
 label {
     display: block;
     margin-bottom: 5px;
     font-size: 14px;
 }
 
-/* Inputs */
-input, textarea {
+/* ================= INPUTS ================= */
+
+input,
+textarea {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     background: black;
     border: 1px solid #00ffee;
     color: #00ffee;
     outline: none;
+    box-sizing: border-box;
 }
 
-/* Button */
+/* ================= UNIVERSAL BUTTON SYSTEM ================= */
+
+button,
+input[type="submit"],
+input[type="button"],
+a.btn,
 .btn {
-    width: fit-content;
-    padding: 12px;
+    width: 100%;
+    height: 48px;
+
+    display: block;
+    margin: 0;
+
+    padding: 0 15px;
+    box-sizing: border-box;
+
     background: transparent;
     border: 2px solid #00ffee;
     color: #00ffee;
+
+    text-align: center;
     cursor: pointer;
     transition: 0.3s;
-    display: block;
-    margin: 20px auto 0;
+
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
 }
 
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+a.btn:hover,
 .btn:hover {
     background: #00ffee;
     color: black;
     box-shadow: 0 0 15px #00ffee;
 }
+
 /* ================= MODAL ================= */
 
 .modal {
     display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background: rgba(0, 0, 0, 0.85);
     justify-content: center;
     align-items: center;
@@ -103,44 +135,31 @@ input, textarea {
 }
 
 .modal-content input {
-    width: 90%;
+    width: 100%;
     padding: 10px;
-    border-radius: 6px;
-    border: none;
-    outline: none;
     background: #1a2a33;
     color: #00f7ff;
-}
-
-.cancel-btn {
-    background: #222;
-    margin-top: 10px;
+    border: none;
+    outline: none;
 }
 
 @keyframes fadeIn {
-    from { transform: scale(0.8); opacity: 0; }
+    from { transform: scale(0.9); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
 }
 
+/* ================= BACKGROUND VIDEO ================= */
 
+.bg-video,
 #bgVideo {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index:-1;
-}
-.bg-video {
-    position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     z-index: -1;
 }
+
 /* ================= DASHBOARD ================= */
 
 .dashboard-grid {
@@ -171,6 +190,8 @@ input, textarea {
     color: #00ffcc;
 }
 
+/* ================= TOP BUTTONS ================= */
+
 .logout {
     position: absolute;
     top: 20px;
@@ -178,6 +199,7 @@ input, textarea {
     color: #00ffcc;
     text-decoration: none;
 }
+
 .logs-btn {
     position: absolute;
     top: 20px;
@@ -189,13 +211,17 @@ input, textarea {
     border-radius: 6px;
     color: #00ffcc;
     text-decoration: none;
-    transition: 0.3s;
 }
-
-.logs-btn:hover {
-    background: #00ffcc;
+.logs-btn:hover,
+.logs-btn:active,
+.logs-btn:focus {
+    background: #00ffee;
     color: black;
+    box-shadow: 0 0 20px #00ffee;
+    border-color: #00ffee;
 }
+/* ================= PASSWORD TOGGLE ================= */
+
 .password-wrapper {
     position: relative;
     width: 100%;
@@ -203,7 +229,6 @@ input, textarea {
 
 .password-wrapper input {
     width: 100%;
-    box-sizing: border-box;   /* IMPORTANT FIX */
     padding-right: 40px;
 }
 
@@ -214,24 +239,61 @@ input, textarea {
     transform: translateY(-50%);
     cursor: pointer;
     color: #00f7ff;
-    font-size: 16px;
 }
-#typewriter {
-    max-width: 100%;
-    padding: 15px;
-    margin-top: 20px;
 
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
+/* ================= RESULT BOX ================= */
+
+#typewriter {
+    width: 100%;
+    padding: 10px 0;
+    background: transparent;
+    border: none;
+    text-align: center;
+    font-size: 18px;
 
     white-space: pre-wrap;
+    word-break: break-word;
+    letter-spacing: 1px;
 
     max-height: 250px;
     overflow-y: auto;
 
-    font-family: monospace;
-    text-align: left;
-    letter-spacing: 1px;
     line-height: 1.6;
+}
+.secure-btn {
+    display: inline-block;
+    text-decoration: none;
+
+    background: transparent;          /* default transparent */
+    border: 2px solid #00ccaa;         /* rectangle border */
+    color: #00ccaa;
+
+    font-family: "Courier New", Courier, monospace;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+
+    padding: 10px 26px;
+    border-radius: 0;                 /* sharp rectangle */
+
+    text-shadow: 0 0 6px rgba(0, 255, 238, 0.6);
+    transition: 
+        background 0.25s ease,
+        color 0.25s ease,
+        border-color 0.25s ease;
+}
+.secure-btn:hover,
+.secure-btn:focus {
+    background: #00ffee;      /* color appears ONLY on touch */
+    color: #001414;           /* dark text for contrast */
+    border-color: #00ffee;
+    text-shadow: none;
+    box-shadow: 
+        0 0 14px rgba(0, 255, 238, 0.548),
+        0 0 20px rgba(0, 204, 170, 0.25);
+
+}
+.enter-btn {
+    margin-top: 18px;      /* space from text above */
+    text-align: center;    /* centers the button */
 }

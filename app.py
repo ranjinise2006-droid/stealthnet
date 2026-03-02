@@ -116,17 +116,23 @@ def validate_password(password):
 # STEGANOGRAPHY FUNCTIONS
 # ==============================
 
+from PIL import Image
+
 DELIMITER = "<<<STEALTHNET>>>"
 
 def encode_image(image_path, secret_message, password, output_path):
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("RGB")
     encoded = image.copy()
 
     secret_message = secret_message.strip()
     password = password.strip()
 
-    message = password + DELIMITER + secret_message + DELIMITER
+    message = password + DELIMITER + secret_message
     binary_msg = ''.join(format(ord(i), '08b') for i in message)
+
+    # Store length in first 32 bits
+    msg_length = format(len(binary_msg), '032b')
+    binary_msg = msg_length + binary_msg
 
     pixels = encoded.load()
     width, height = encoded.size
@@ -157,33 +163,60 @@ def encode_image(image_path, secret_message, password, output_path):
     encoded.save(output_path)
 
 def decode_image(image_path, password):
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("RGB")
     pixels = image.load()
     width, height = image.size
 
     binary_data = ""
+    data_bits = []
 
+    # Step 1: Read first 32 bits (message length)
+    count = 0
     for y in range(height):
         for x in range(width):
             for n in range(3):
                 binary_data += str(pixels[x, y][n] & 1)
-
-    all_bytes = [binary_data[i:i+8] for i in range(0, len(binary_data), 8)]
-
-    decoded = ""
-
-    for byte in all_bytes:
-        if len(byte) < 8:
-            continue
-
-        decoded += chr(int(byte, 2))
-
-        if decoded.count(DELIMITER) == 2:
+                count += 1
+                if count == 32:
+                    break
+            if count == 32:
+                break
+        if count == 32:
             break
+
+    message_length = int(binary_data, 2)
+
+    # Step 2: Read only required bits
+    binary_data = ""
+    count = 0
+    total_bits_read = 0
+
+    for y in range(height):
+        for x in range(width):
+            for n in range(3):
+
+                if total_bits_read >= 32:
+                    if count < message_length:
+                        data_bits.append(str(pixels[x, y][n] & 1))
+                        count += 1
+                    else:
+                        break
+
+                total_bits_read += 1
+
+            if count >= message_length:
+                break
+        if count >= message_length:
+            break
+
+    binary_string = ''.join(data_bits)
+
+    all_bytes = [binary_string[i:i+8] for i in range(0, len(binary_string), 8)]
+    decoded = ''.join(chr(int(byte, 2)) for byte in all_bytes)
 
     parts = decoded.split(DELIMITER)
 
-    if len(parts) < 3:
+    if len(parts) < 2:
         return "INVALID_PASSWORD"
 
     extracted_password = parts[0].strip()
@@ -285,18 +318,33 @@ def embed():
         secret = request.form["secret"].strip()
         password = request.form["password"].strip()
 
+        # Validate
+        if not image or not secret or not password:
+            flash("All fields are required.")
+            return redirect(url_for("embed"))
+
+        # Check allowed extensions
+        if not image.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            flash("Only PNG, JPG and JPEG formats are allowed.")
+            return redirect(url_for("embed"))
+
         encrypted_secret = encrypt_message(secret, password)
 
         if image:
             # Save uploaded file
             filename = secure_filename(image.filename)
+
+            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
             temp_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
             image.save(temp_path)
 
-            # Convert to PNG
-            img = Image.open(temp_path)
+            # Convert ANY image to PNG (VERY IMPORTANT)
+            img = Image.open(temp_path).convert("RGB")
+
             png_filename = os.path.splitext(filename)[0] + ".png"
             png_path = os.path.join(app.config["UPLOAD_FOLDER"], png_filename)
+
             img.save(png_path, "PNG")
 
             # Create output filename
@@ -318,7 +366,6 @@ def embed():
             return render_template("generated.html", image_file=output_filename)
 
     return render_template("embed.html")
-
 # -------- EXTRACT --------
 @app.route('/extract', methods=['GET', 'POST'])
 @login_required
@@ -349,7 +396,7 @@ def extract():
 
         log_activity(current_user.id, "Extract Secret")
 
-        return render_template("result.html", secret=decrypted_message)
+        return render_template("result.html", decrypted_message=decrypted_message)
 
     return render_template("extract.html")
 
@@ -415,3 +462,7 @@ def view_logs():
 
 with app.app_context():
    db.create_all()
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
