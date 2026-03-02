@@ -6,9 +6,10 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 from flask_mail import Mail, Message
 from sqlalchemy.exc import IntegrityError
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 import base64
-import hashlib
 import os
 import re
 import datetime
@@ -85,19 +86,32 @@ def log_activity(user_id, action):
 # AES ENCRYPTION FUNCTIONS
 # ==============================
 
-def generate_key(password):
-    key = hashlib.sha256(password.encode()).digest()
-    return base64.urlsafe_b64encode(key)
+def generate_key(password, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=200000,
+    )
+    return kdf.derive(password.encode())
 
 def encrypt_message(message, password):
-    key = generate_key(password)
-    cipher = Fernet(key)
-    return cipher.encrypt(message.encode()).decode()
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    key = generate_key(password, salt)
+    cipher = AESGCM(key)
+    ciphertext = cipher.encrypt(nonce, message.encode(), None)
+    payload = salt + nonce + ciphertext
+    return base64.urlsafe_b64encode(payload).decode()
 
 def decrypt_message(encrypted_message, password):
-    key = generate_key(password)
-    cipher = Fernet(key)
-    return cipher.decrypt(encrypted_message.encode()).decode()
+    data = base64.urlsafe_b64decode(encrypted_message.encode())
+    salt = data[:16]
+    nonce = data[16:28]
+    ciphertext = data[28:]
+    key = generate_key(password, salt)
+    cipher = AESGCM(key)
+    return cipher.decrypt(nonce, ciphertext, None).decode()
 
 # ==============================
 # PASSWORD VALIDATION
@@ -118,16 +132,12 @@ def validate_password(password):
 
 from PIL import Image
 
-DELIMITER = "<<<STEALTHNET>>>"
-
 def encode_image(image_path, secret_message, password, output_path):
     image = Image.open(image_path).convert("RGB")
     encoded = image.copy()
 
     secret_message = secret_message.strip()
-    password = password.strip()
-
-    message = password + DELIMITER + secret_message
+    message = secret_message
     binary_msg = ''.join(format(ord(i), '08b') for i in message)
 
     # Store length in first 32 bits
@@ -209,23 +219,14 @@ def decode_image(image_path, password):
         if count >= message_length:
             break
 
+    if count < message_length:
+        return "INVALID_PASSWORD"
+
     binary_string = ''.join(data_bits)
 
     all_bytes = [binary_string[i:i+8] for i in range(0, len(binary_string), 8)]
-    decoded = ''.join(chr(int(byte, 2)) for byte in all_bytes)
-
-    parts = decoded.split(DELIMITER)
-
-    if len(parts) < 2:
-        return "INVALID_PASSWORD"
-
-    extracted_password = parts[0].strip()
-    encrypted_message = parts[1]
-
-    if extracted_password == password.strip():
-        return encrypted_message
-    else:
-        return "INVALID_PASSWORD"
+    decoded = ''.join(chr(int(byte, 2)) for byte in all_bytes if len(byte) == 8)
+    return decoded
 # ==============================
 # ROUTES
 # ==============================
@@ -448,6 +449,10 @@ Use your secret key to extract the hidden message.
 @app.route("/logs")
 @login_required
 def view_logs():
+    if current_user.role != "admin":
+        flash("Only admin can access logs.")
+        return redirect(url_for("dashboard"))
+
     # Set number of days to keep logs
     LOG_RETENTION_DAYS = 1   # Change this to 1, 3, 7, 30 etc.
 

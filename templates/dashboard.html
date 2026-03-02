@@ -6,9 +6,11 @@
 
 <a class="logout" href="{{ url_for('logout') }}">LOGOUT</a>
 
+{% if current_user.role == "admin" %}
 <a href="{{ url_for('view_logs') }}" class="logs-btn">
-    📜 View Activity Logs
+    View Activity Logs
 </a>
+{% endif %}
 
 <h1 style="text-align:center; margin-top:50px;">
      STEALTHNET COMMAND CENTER
@@ -17,14 +19,14 @@
 <div class="dashboard-grid">
     <a class="dashboard-link" href="{{ url_for('embed') }}">
         <div class="dashboard-card">
-            <h3>🖼 Embed Secret</h3>
+            <h3>Embed Secret</h3>
             <p>Hide classified message inside image</p>
         </div>
     </a>
 
     <a class="dashboard-link" href="{{ url_for('extract') }}">
         <div class="dashboard-card">
-            <h3>🔍 Extract Secret</h3>
+            <h3>Extract Secret</h3>
             <p>Recover hidden intelligence data</p>
         </div>
     </a>

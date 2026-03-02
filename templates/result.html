@@ -8,20 +8,19 @@
 <script defer src="{{ url_for('static', filename='js/reveal.js') }}"></script>
 
 <div class="card">
+    <h2>WARNING CLASSIFIED DATA RECOVERED</h2>
 
-    <h2>⚠ CLASSIFIED DATA RECOVERED</h2>
-    <p class="subtitle">Decrypting Intelligence Payload...</p>
+    <div class="result-layout">
+        <p class="subtitle">Decrypting Intelligence Payload...</p>
 
-    <div id="typewriter"
-         data-text="{{decrypted_message}}"
-         style="margin-top:30px; font-size:18px; min-height:60px;">
+        <div id="typewriter" data-text="{{ decrypted_message }}"></div>
+
+        <div class="enter-btn">
+            <a href="{{ url_for('dashboard') }}" class="secure-btn">
+                Return to Dashboard
+            </a>
+        </div>
     </div>
-
-    <div class="enter-btn">
-    <a href="{{ url_for('dashboard') }}" class="secure-btn">
-        Return to Dashboard
-    </a>
-
 </div>
 
 {% endblock %}

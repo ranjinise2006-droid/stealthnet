@@ -51,7 +51,7 @@ h2 {
     text-align: center;
     font-size: 14px;
     color: #00ccaa;
-    margin-bottom: 20px;
+    margin: 0;
 }
 
 label {
@@ -71,6 +71,7 @@ textarea {
     color: #00ffee;
     outline: none;
     box-sizing: border-box;
+    border-radius: 10px;
 }
 
 /* ================= UNIVERSAL BUTTON SYSTEM ================= */
@@ -99,6 +100,7 @@ a.btn,
 
     font-family: 'Courier New', monospace;
     font-size: 14px;
+    border-radius: 10px;
 }
 
 button:hover,
@@ -242,14 +244,28 @@ a.btn:hover,
 }
 
 /* ================= RESULT BOX ================= */
+.result-layout {
+    width: 100%;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
 
 #typewriter {
     width: 100%;
     padding: 10px 0;
     background: transparent;
     border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     font-size: 18px;
+    margin: 16px auto;
+    min-height: 72px;
 
     white-space: pre-wrap;
     word-break: break-word;
@@ -274,7 +290,7 @@ a.btn:hover,
     text-transform: uppercase;
 
     padding: 10px 26px;
-    border-radius: 0;                 /* sharp rectangle */
+    border-radius: 10px;              /* curved rectangle */
 
     text-shadow: 0 0 6px rgba(0, 255, 238, 0.6);
     transition: 
@@ -294,6 +310,8 @@ a.btn:hover,
 
 }
 .enter-btn {
-    margin-top: 18px;      /* space from text above */
+    margin-top: 0;
     text-align: center;    /* centers the button */
 }
+
+
