@@ -9,12 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
+from werkzeug.middleware.proxy_fix import ProxyFix
 import cloudinary
 import cloudinary.uploader
 import base64
 import os
 import re
 import datetime
+from urllib.parse import urljoin
 
 # ==============================
 # APP CONFIGURATION
@@ -22,6 +24,7 @@ import datetime
 
 app = Flask(__name__)
 app.secret_key = "SUPER_SECRET_CLASSIFIED_KEY"
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stealthnet.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -40,6 +43,7 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
 CLOUDINARY_FOLDER = os.environ.get("CLOUDINARY_FOLDER", "stealthnet")
+BASE_URL = os.environ.get("BASE_URL", "https://stealthnet.onrender.com").rstrip("/")
 
 CLOUDINARY_ENABLED = all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET])
 
@@ -132,6 +136,13 @@ def upload_encoded_image(file_path):
         resource_type="image"
     )
     return result["secure_url"]
+
+def build_public_url(path_or_url):
+    if not path_or_url:
+        return ""
+    if path_or_url.startswith(("http://", "https://")):
+        return path_or_url
+    return urljoin(BASE_URL + "/", path_or_url.lstrip("/"))
 
 # ==============================
 # AES ENCRYPTION FUNCTIONS
@@ -489,11 +500,9 @@ def share_email():
         if not image_url:
             if not filename:
                 return jsonify({"status": "error", "message": "Missing image"}), 400
-            base_url = os.environ.get("BASE_URL", request.host_url.rstrip("/"))
-            image_url = f"{base_url}/static/encoded/{filename}"
-        elif image_url.startswith("/"):
-            base_url = os.environ.get("BASE_URL", request.host_url.rstrip("/"))
-            image_url = f"{base_url}{image_url}"
+            image_url = f"/static/encoded/{filename}"
+
+        image_url = build_public_url(image_url)
 
         msg = Message(
             subject="StealthNet Classified Image",
@@ -507,6 +516,12 @@ Access your encoded image:
 {image_url}
 
 Use your secret key to extract the hidden message.
+"""
+        msg.html = f"""
+<p><strong>STEALTHNET SECURE TRANSMISSION</strong></p>
+<p>Access your encoded image:</p>
+<p><a href="{image_url}">{image_url}</a></p>
+<p>Use your secret key to extract the hidden message.</p>
 """
 
         mail.send(msg)
