@@ -508,10 +508,22 @@ def share_email():
         if not recipient:
             return jsonify({"status": "error", "message": "Missing data"}), 400
 
+        attachment_added = False
+        safe_filename = secure_filename(filename or "")
+        encoded_path = os.path.join(app.config["ENCODED_FOLDER"], safe_filename) if safe_filename else ""
+
+        if safe_filename and os.path.exists(encoded_path):
+            with open(encoded_path, "rb") as image_fp:
+                msg_data = image_fp.read()
+            msg_content_type = "image/png" if safe_filename.lower().endswith(".png") else "application/octet-stream"
+        else:
+            msg_data = None
+            msg_content_type = None
+
         if not image_url:
-            if not filename:
+            if not safe_filename:
                 return jsonify({"status": "error", "message": "Missing image"}), 400
-            image_url = url_for("serve_encoded", filename=filename)
+            image_url = url_for("serve_encoded", filename=safe_filename)
 
         image_url = build_public_url(image_url)
 
@@ -520,6 +532,13 @@ def share_email():
             recipients=[recipient]
         )
 
+        if msg_data is not None:
+            msg.attach(safe_filename, msg_content_type, msg_data)
+            attachment_added = True
+
+        attachment_note_text = "\nThis email also includes the encoded image as an attachment.\n" if attachment_added else ""
+        attachment_note_html = "<p>This email also includes the encoded image as an attachment.</p>" if attachment_added else ""
+
         msg.body = f"""
 STEALTHNET SECURE TRANSMISSION
 
@@ -527,12 +546,14 @@ Access your encoded image:
 {image_url}
 
 Use your secret key to extract the hidden message.
+{attachment_note_text}
 """
         msg.html = f"""
 <p><strong>STEALTHNET SECURE TRANSMISSION</strong></p>
 <p>Access your encoded image:</p>
 <p><a href="{image_url}">{image_url}</a></p>
 <p>Use your secret key to extract the hidden message.</p>
+{attachment_note_html}
 """
 
         mail.send(msg)
