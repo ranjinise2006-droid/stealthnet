@@ -372,6 +372,13 @@ def login():
 def dashboard():
     return render_template("dashboard.html")
 
+@app.before_request
+def redirect_legacy_static_encoded():
+    legacy_prefix = "/static/encoded/"
+    if request.path.startswith(legacy_prefix):
+        legacy_filename = request.path[len(legacy_prefix):]
+        return redirect(url_for("serve_encoded", filename=legacy_filename), code=302)
+
 @app.route("/encoded/<path:filename>")
 def serve_encoded(filename):
     return send_from_directory(app.config["ENCODED_FOLDER"], filename, as_attachment=False)
