@@ -16,11 +16,15 @@
     <br><br>
 
     <!-- DOWNLOAD -->
-    <a href="{{ display_url }}" download>
+    <a href="{{ display_url }}" download onclick="showDownloadWarning()">
         <button class="btn">Download Image</button>
     </a>
 
     <br><br>
+
+    <div id="downloadWarning" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; padding:12px; border-radius:8px; max-width:520px; margin:0 auto 20px auto; text-align:left;">
+        <strong>Warning:</strong> Do not share via WhatsApp or Instagram. Do not take screenshots because pixel data can break. Share only through email.
+    </div>
 
     <!-- SHARE -->
     <button class="btn" onclick="openEmailModal()">
@@ -100,6 +104,15 @@ function closeSuccessModal() {
     document.getElementById("successModal").style.display = "none";
 }
 
+function showDownloadWarning() {
+    const warningBox = document.getElementById("downloadWarning");
+    warningBox.style.display = "block";
+    clearTimeout(warningBox.hideTimer);
+    warningBox.hideTimer = setTimeout(() => {
+        warningBox.style.display = "none";
+    }, 10000);
+}
+
 document.getElementById("emailForm").addEventListener("submit", function(e) {
     e.preventDefault();
 
@@ -127,3 +140,4 @@ document.getElementById("emailForm").addEventListener("submit", function(e) {
 </script>
 
 {% endblock %}
+

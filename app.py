@@ -32,6 +32,10 @@ app.config["ENCODED_FOLDER"] = os.path.join(app.root_path, "static", "encoded")
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["ENCODED_FOLDER"], exist_ok=True)
 
+ADMIN_BOOTSTRAP_USERNAME = os.environ.get("ADMIN_BOOTSTRAP_USERNAME", "ranjini")
+ADMIN_BOOTSTRAP_PASSWORD = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ranjini!")
+ADMIN_BOOTSTRAP_EMAIL = os.environ.get("ADMIN_BOOTSTRAP_EMAIL", "ranjini@stealthnet.local")
+
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
@@ -97,6 +101,28 @@ def load_user(user_id):
 def log_activity(user_id, action):
     log = ActivityLog(user_id=user_id, action=action)
     db.session.add(log)
+    db.session.commit()
+
+def ensure_bootstrap_admin():
+    user = User.query.filter_by(username=ADMIN_BOOTSTRAP_USERNAME).first()
+    hashed_password = bcrypt.generate_password_hash(ADMIN_BOOTSTRAP_PASSWORD).decode("utf-8")
+
+    if user:
+        user.role = "admin"
+        user.password = hashed_password
+        if not user.email:
+            user.email = ADMIN_BOOTSTRAP_EMAIL
+    else:
+        email_in_use = User.query.filter_by(email=ADMIN_BOOTSTRAP_EMAIL).first()
+        email = ADMIN_BOOTSTRAP_EMAIL if not email_in_use else f"{ADMIN_BOOTSTRAP_USERNAME}@admin.local"
+        user = User(
+            username=ADMIN_BOOTSTRAP_USERNAME,
+            email=email,
+            password=hashed_password,
+            role="admin"
+        )
+        db.session.add(user)
+
     db.session.commit()
 
 def upload_encoded_image(file_path):
@@ -514,7 +540,10 @@ def view_logs():
 
 with app.app_context():
    db.create_all()
+   ensure_bootstrap_admin()
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
