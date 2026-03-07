@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
@@ -30,7 +30,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stealthnet.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "uploads")
-app.config["ENCODED_FOLDER"] = os.path.join(app.root_path, "static", "encoded")
+app.config["ENCODED_FOLDER"] = os.path.join(app.config["UPLOAD_FOLDER"], "encoded")
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["ENCODED_FOLDER"], exist_ok=True)
@@ -372,6 +372,10 @@ def login():
 def dashboard():
     return render_template("dashboard.html")
 
+@app.route("/encoded/<path:filename>")
+def serve_encoded(filename):
+    return send_from_directory(app.config["ENCODED_FOLDER"], filename, as_attachment=False)
+
 # -------- EMBED --------
 @app.route("/embed", methods=["GET", "POST"])
 @login_required
@@ -423,7 +427,7 @@ def embed():
             # Encode image
             encode_image(png_path, encrypted_secret, password, output_path)
 
-            image_url = url_for("static", filename=f"encoded/{output_filename}")
+            image_url = url_for("serve_encoded", filename=output_filename)
             if CLOUDINARY_ENABLED:
                 try:
                     image_url = upload_encoded_image(output_path)
@@ -500,7 +504,7 @@ def share_email():
         if not image_url:
             if not filename:
                 return jsonify({"status": "error", "message": "Missing image"}), 400
-            image_url = f"/static/encoded/{filename}"
+            image_url = url_for("serve_encoded", filename=filename)
 
         image_url = build_public_url(image_url)
 

@@ -5,7 +5,7 @@
 {% block content %}
 
 <div class="card">
-    {% set display_url = image_url or url_for('static', filename='encoded/' + image_file) %}
+    {% set display_url = image_url or url_for('serve_encoded', filename=image_file) %}
 
     <h2>✶ Classified Image Generated</h2>
     <p>Verify your encoded image before proceeding.</p>
