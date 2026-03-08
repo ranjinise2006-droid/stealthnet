@@ -17,6 +17,12 @@ import os
 import re
 import datetime
 from urllib.parse import urljoin
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import uuid
+import json
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 # ==============================
 # APP CONFIGURATION
@@ -62,10 +68,20 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = 'stealthnet01@gmail.com'
 app.config['MAIL_PASSWORD'] = 'iaowqqpvwmbldkpb'
 app.config['MAIL_DEFAULT_SENDER'] = 'stealthnet01@gmail.com'
+app.config['MAIL_TIMEOUT'] = int(os.environ.get("MAIL_TIMEOUT", "15"))
+
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
+if not EMAIL_PROVIDER:
+    EMAIL_PROVIDER = "resend" if RESEND_API_KEY else "smtp"
+RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev").strip()
 
 mail = Mail(app)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
+MAIL_SEND_EXECUTOR = ThreadPoolExecutor(max_workers=int(os.environ.get("MAIL_SEND_WORKERS", "2")))
+EMAIL_JOBS = {}
+EMAIL_JOBS_LOCK = threading.Lock()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -143,6 +159,116 @@ def build_public_url(path_or_url):
     if path_or_url.startswith(("http://", "https://")):
         return path_or_url
     return urljoin(BASE_URL + "/", path_or_url.lstrip("/"))
+
+def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, text_body, html_body):
+    if EMAIL_PROVIDER == "resend":
+        if not RESEND_API_KEY:
+            raise ValueError("RESEND_API_KEY not configured")
+
+        payload = {
+            "from": RESEND_FROM,
+            "to": [recipient],
+            "subject": "StealthNet Classified Image",
+            "text": text_body,
+            "html": html_body,
+            "attachments": [
+                {
+                    "filename": safe_filename,
+                    "content": base64.b64encode(msg_data).decode("ascii")
+                }
+            ]
+        }
+
+        req = Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+
+        try:
+            with urlopen(req, timeout=20) as resp:
+                if resp.status not in (200, 201, 202):
+                    raise ValueError(f"Resend rejected request with status {resp.status}")
+        except HTTPError as e:
+            details = e.read().decode("utf-8", errors="ignore")
+            raise ValueError(f"Resend HTTP error {e.code}: {details}") from e
+        except URLError as e:
+            raise ValueError(f"Resend network error: {e.reason}") from e
+        return
+
+    msg = Message(
+        subject="StealthNet Classified Image",
+        recipients=[recipient]
+    )
+    msg.attach(safe_filename, msg_content_type, msg_data)
+    msg.body = text_body
+    msg.html = html_body
+    mail.send(msg)
+
+def _set_email_job_status(job_id, status, message, user_id):
+    with EMAIL_JOBS_LOCK:
+        EMAIL_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": status,
+            "message": message,
+            "user_id": user_id,
+            "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+        }
+
+def send_share_email_job(job_id, recipient, safe_filename, user_id):
+    with app.app_context():
+        try:
+            _set_email_job_status(job_id, "sending", "Sending email...", user_id)
+
+            attachment_added = False
+            msg_data = None
+            msg_content_type = None
+
+            encoded_path = os.path.join(app.config["ENCODED_FOLDER"], safe_filename) if safe_filename else ""
+            if safe_filename and os.path.exists(encoded_path):
+                with open(encoded_path, "rb") as image_fp:
+                    msg_data = image_fp.read()
+                msg_content_type = "image/png" if safe_filename.lower().endswith(".png") else "application/octet-stream"
+
+            if msg_data is None:
+                raise ValueError("Encoded image attachment is required")
+
+            attachment_added = True
+
+            attachment_note_text = "\nThis email also includes the encoded image as an attachment.\n" if attachment_added else ""
+            attachment_note_html = "<p>This email also includes the encoded image as an attachment.</p>" if attachment_added else ""
+
+            text_body = f"""
+STEALTHNET SECURE TRANSMISSION
+
+Attached: encoded image file
+Use your secret key to extract the hidden message from the attached image.
+{attachment_note_text}
+"""
+            html_body = f"""
+<p><strong>STEALTHNET SECURE TRANSMISSION</strong></p>
+<p>Attached: encoded image file</p>
+<p>Use your secret key to extract the hidden message from the attached image.</p>
+{attachment_note_html}
+"""
+
+            send_classified_email(
+                recipient=recipient,
+                safe_filename=safe_filename,
+                msg_data=msg_data,
+                msg_content_type=msg_content_type,
+                text_body=text_body,
+                html_body=html_body
+            )
+            log_activity(user_id, "Email Share")
+            _set_email_job_status(job_id, "sent", "Email sent successfully.", user_id)
+        except Exception as e:
+            print("Mail Error:", e)
+            _set_email_job_status(job_id, "failed", f"Email send failed: {str(e)}", user_id)
 
 # ==============================
 # AES ENCRYPTION FUNCTIONS
@@ -502,69 +628,55 @@ def logout():
 def share_email():
     try:
         recipient = request.form.get("recipient")
-        image_url = request.form.get("image_url")
         filename = request.form.get("image_file")
 
         if not recipient:
             return jsonify({"status": "error", "message": "Missing data"}), 400
 
-        attachment_added = False
         safe_filename = secure_filename(filename or "")
-        encoded_path = os.path.join(app.config["ENCODED_FOLDER"], safe_filename) if safe_filename else ""
 
-        if safe_filename and os.path.exists(encoded_path):
-            with open(encoded_path, "rb") as image_fp:
-                msg_data = image_fp.read()
-            msg_content_type = "image/png" if safe_filename.lower().endswith(".png") else "application/octet-stream"
-        else:
-            msg_data = None
-            msg_content_type = None
+        if not safe_filename:
+            return jsonify({"status": "error", "message": "Missing image attachment"}), 400
 
-        if not image_url:
-            if not safe_filename:
-                return jsonify({"status": "error", "message": "Missing image"}), 400
-            image_url = url_for("serve_encoded", filename=safe_filename)
+        job_id = uuid.uuid4().hex
+        _set_email_job_status(job_id, "queued", "Email queued for delivery.", current_user.id)
 
-        image_url = build_public_url(image_url)
-
-        msg = Message(
-            subject="StealthNet Classified Image",
-            recipients=[recipient]
+        MAIL_SEND_EXECUTOR.submit(
+            send_share_email_job,
+            job_id,
+            recipient,
+            safe_filename,
+            current_user.id
         )
 
-        if msg_data is not None:
-            msg.attach(safe_filename, msg_content_type, msg_data)
-            attachment_added = True
-
-        attachment_note_text = "\nThis email also includes the encoded image as an attachment.\n" if attachment_added else ""
-        attachment_note_html = "<p>This email also includes the encoded image as an attachment.</p>" if attachment_added else ""
-
-        msg.body = f"""
-STEALTHNET SECURE TRANSMISSION
-
-Access your encoded image:
-{image_url}
-
-Use your secret key to extract the hidden message.
-{attachment_note_text}
-"""
-        msg.html = f"""
-<p><strong>STEALTHNET SECURE TRANSMISSION</strong></p>
-<p>Access your encoded image:</p>
-<p><a href="{image_url}">{image_url}</a></p>
-<p>Use your secret key to extract the hidden message.</p>
-{attachment_note_html}
-"""
-
-        mail.send(msg)
-
-        log_activity(current_user.id, "Email Share")
-
-        return jsonify({"status": "success"})
+        return jsonify({
+            "status": "success",
+            "message": "Email queued for delivery",
+            "job_id": job_id
+        }), 202
 
     except Exception as e:
         print("Mail Error:", e)
         return jsonify({"status": "error", "message": "Server error"}), 500
+
+@app.route("/share-email-status/<job_id>", methods=["GET"])
+@login_required
+def share_email_status(job_id):
+    with EMAIL_JOBS_LOCK:
+        job = EMAIL_JOBS.get(job_id)
+
+    if not job:
+        return jsonify({"status": "error", "message": "Job not found"}), 404
+
+    if job.get("user_id") != current_user.id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    return jsonify({
+        "status": "success",
+        "delivery_status": job["status"],
+        "message": job["message"],
+        "updated_at": job["updated_at"]
+    })
 
 @app.route("/logs")
 @login_required
