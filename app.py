@@ -1,10 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from PIL import Image
 from werkzeug.utils import secure_filename
-from flask_mail import Mail, Message
 from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -16,20 +15,21 @@ import base64
 import os
 import re
 import datetime
-from urllib.parse import urljoin
-from concurrent.futures import ThreadPoolExecutor
-import threading
-import uuid
 import json
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+import smtplib
+from email.message import EmailMessage
+from email.policy import SMTP
+import time
+import ssl
 
 # ==============================
 # APP CONFIGURATION
 # ==============================
 
 app = Flask(__name__)
-app.secret_key = "SUPER_SECRET_CLASSIFIED_KEY"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "SUPER_SECRET_CLASSIFIED_KEY")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stealthnet.db'
@@ -49,7 +49,6 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
 CLOUDINARY_FOLDER = os.environ.get("CLOUDINARY_FOLDER", "stealthnet")
-BASE_URL = os.environ.get("BASE_URL", "https://stealthnet.onrender.com").rstrip("/")
 
 CLOUDINARY_ENABLED = all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET])
 
@@ -62,26 +61,23 @@ if CLOUDINARY_ENABLED:
     )
 
 # -------- MAIL CONFIG --------
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'stealthnet01@gmail.com'
-app.config['MAIL_PASSWORD'] = 'iaowqqpvwmbldkpb'
-app.config['MAIL_DEFAULT_SENDER'] = 'stealthnet01@gmail.com'
-app.config['MAIL_TIMEOUT'] = int(os.environ.get("MAIL_TIMEOUT", "15"))
+app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
+app.config['MAIL_PORT'] = int(os.environ.get("MAIL_PORT", "587"))
+app.config['MAIL_USE_TLS'] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+app.config['MAIL_USERNAME'] = os.environ.get("MAIL_USERNAME", "stealthnet01@gmail.com")
+app.config['MAIL_PASSWORD'] = os.environ.get("MAIL_PASSWORD", "qxsuvfdsmlfroxka")
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get("MAIL_DEFAULT_SENDER", app.config['MAIL_USERNAME'])
+app.config['MAIL_TIMEOUT'] = int(os.environ.get("MAIL_TIMEOUT", "20"))
+EMAIL_SEND_TIMEOUT_SECONDS = int(os.environ.get("EMAIL_SEND_TIMEOUT_SECONDS", "20"))
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
-if not EMAIL_PROVIDER:
-    EMAIL_PROVIDER = "resend" if RESEND_API_KEY else "smtp"
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "smtp").strip().lower()
+if EMAIL_PROVIDER not in ("smtp", "resend"):
+    EMAIL_PROVIDER = "smtp"
 RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev").strip()
 
-mail = Mail(app)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
-MAIL_SEND_EXECUTOR = ThreadPoolExecutor(max_workers=int(os.environ.get("MAIL_SEND_WORKERS", "2")))
-EMAIL_JOBS = {}
-EMAIL_JOBS_LOCK = threading.Lock()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -124,12 +120,14 @@ def log_activity(user_id, action):
     db.session.commit()
 
 def ensure_bootstrap_admin():
+    force_reset = os.environ.get("FORCE_ADMIN_PASSWORD_RESET", "false").lower() == "true"
     user = User.query.filter_by(username=ADMIN_BOOTSTRAP_USERNAME).first()
     hashed_password = bcrypt.generate_password_hash(ADMIN_BOOTSTRAP_PASSWORD).decode("utf-8")
 
     if user:
         user.role = "admin"
-        user.password = hashed_password
+        if force_reset:
+            user.password = hashed_password
         if not user.email:
             user.email = ADMIN_BOOTSTRAP_EMAIL
     else:
@@ -153,14 +151,7 @@ def upload_encoded_image(file_path):
     )
     return result["secure_url"]
 
-def build_public_url(path_or_url):
-    if not path_or_url:
-        return ""
-    if path_or_url.startswith(("http://", "https://")):
-        return path_or_url
-    return urljoin(BASE_URL + "/", path_or_url.lstrip("/"))
-
-def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, text_body, html_body):
+def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, text_body, html_body, timeout_seconds):
     if EMAIL_PROVIDER == "resend":
         if not RESEND_API_KEY:
             raise ValueError("RESEND_API_KEY not configured")
@@ -190,7 +181,7 @@ def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, 
         )
 
         try:
-            with urlopen(req, timeout=20) as resp:
+            with urlopen(req, timeout=timeout_seconds) as resp:
                 if resp.status not in (200, 201, 202):
                     raise ValueError(f"Resend rejected request with status {resp.status}")
         except HTTPError as e:
@@ -200,75 +191,92 @@ def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, 
             raise ValueError(f"Resend network error: {e.reason}") from e
         return
 
-    msg = Message(
-        subject="StealthNet Classified Image",
-        recipients=[recipient]
-    )
-    msg.attach(safe_filename, msg_content_type, msg_data)
-    msg.body = text_body
-    msg.html = html_body
-    mail.send(msg)
+    msg = EmailMessage()
+    msg["Subject"] = "StealthNet Classified Image"
+    msg["From"] = app.config["MAIL_DEFAULT_SENDER"]
+    msg["To"] = recipient
+    msg.set_content(text_body)
+    maintype, subtype = msg_content_type.split("/", 1) if "/" in msg_content_type else ("application", "octet-stream")
+    msg.add_attachment(msg_data, maintype=maintype, subtype=subtype, filename=safe_filename)
 
-def _set_email_job_status(job_id, status, message, user_id):
-    with EMAIL_JOBS_LOCK:
-        EMAIL_JOBS[job_id] = {
-            "job_id": job_id,
-            "status": status,
-            "message": message,
-            "user_id": user_id,
-            "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
-        }
+    smtp_host = app.config["MAIL_SERVER"]
+    smtp_user = app.config["MAIL_USERNAME"]
+    smtp_pass = app.config["MAIL_PASSWORD"]
 
-def send_share_email_job(job_id, recipient, safe_filename, user_id):
-    with app.app_context():
+    last_error = None
+    last_stage = "init"
+    for attempt in range(1, 4):
+        server = None
         try:
-            _set_email_job_status(job_id, "sending", "Sending email...", user_id)
+            last_stage = "connect"
+            server = smtplib.SMTP(smtp_host, app.config["MAIL_PORT"], timeout=timeout_seconds)
+            last_stage = "ehlo-1"
+            server.ehlo_or_helo_if_needed()
+            last_stage = "starttls"
+            server.starttls(context=ssl.create_default_context())
+            last_stage = "ehlo-2"
+            try:
+                server.ehlo_or_helo_if_needed()
+            except Exception:
+                # Some SMTP relays drop post-TLS EHLO responses; continue to login.
+                pass
+            last_stage = "login"
+            server.login(smtp_user, smtp_pass)
+            last_stage = "send"
+            raw_message = msg.as_bytes(policy=SMTP)
+            server.sendmail(app.config["MAIL_DEFAULT_SENDER"], [recipient], raw_message)
+            return
+        except Exception as e:
+            last_error = e
+            time.sleep(1.0)
+        finally:
+            if server is not None:
+                try:
+                    server.quit()
+                except Exception:
+                    pass
 
-            attachment_added = False
-            msg_data = None
-            msg_content_type = None
+    raise ValueError(f"SMTP send failed at '{last_stage}' (TLS587): {repr(last_error)}")
 
-            encoded_path = os.path.join(app.config["ENCODED_FOLDER"], safe_filename) if safe_filename else ""
-            if safe_filename and os.path.exists(encoded_path):
-                with open(encoded_path, "rb") as image_fp:
-                    msg_data = image_fp.read()
-                msg_content_type = "image/png" if safe_filename.lower().endswith(".png") else "application/octet-stream"
+def send_share_email_job(recipient, safe_filename, user_id):
+    msg_data = None
+    msg_content_type = None
 
-            if msg_data is None:
-                raise ValueError("Encoded image attachment is required")
+    encoded_path = os.path.join(app.config["ENCODED_FOLDER"], safe_filename) if safe_filename else ""
+    if safe_filename and os.path.exists(encoded_path):
+        file_size = os.path.getsize(encoded_path)
+        # Keep comfortably below provider limits and unstable network failures.
+        if file_size > 10 * 1024 * 1024:
+            raise ValueError("Attachment too large. Use an image below 10MB.")
+        with open(encoded_path, "rb") as image_fp:
+            msg_data = image_fp.read()
+        msg_content_type = "image/png" if safe_filename.lower().endswith(".png") else "application/octet-stream"
 
-            attachment_added = True
+    if msg_data is None:
+        raise ValueError("Encoded image attachment is required")
 
-            attachment_note_text = "\nThis email also includes the encoded image as an attachment.\n" if attachment_added else ""
-            attachment_note_html = "<p>This email also includes the encoded image as an attachment.</p>" if attachment_added else ""
-
-            text_body = f"""
+    text_body = f"""
 STEALTHNET SECURE TRANSMISSION
 
 Attached: encoded image file
 Use your secret key to extract the hidden message from the attached image.
-{attachment_note_text}
 """
-            html_body = f"""
+    html_body = f"""
 <p><strong>STEALTHNET SECURE TRANSMISSION</strong></p>
 <p>Attached: encoded image file</p>
 <p>Use your secret key to extract the hidden message from the attached image.</p>
-{attachment_note_html}
 """
 
-            send_classified_email(
-                recipient=recipient,
-                safe_filename=safe_filename,
-                msg_data=msg_data,
-                msg_content_type=msg_content_type,
-                text_body=text_body,
-                html_body=html_body
-            )
-            log_activity(user_id, "Email Share")
-            _set_email_job_status(job_id, "sent", "Email sent successfully.", user_id)
-        except Exception as e:
-            print("Mail Error:", e)
-            _set_email_job_status(job_id, "failed", f"Email send failed: {str(e)}", user_id)
+    send_classified_email(
+        recipient=recipient,
+        safe_filename=safe_filename,
+        msg_data=msg_data,
+        msg_content_type=msg_content_type,
+        text_body=text_body,
+        html_body=html_body,
+        timeout_seconds=EMAIL_SEND_TIMEOUT_SECONDS
+    )
+    log_activity(user_id, "Email Share")
 
 # ==============================
 # AES ENCRYPTION FUNCTIONS
@@ -317,8 +325,6 @@ def validate_password(password):
 # ==============================
 # STEGANOGRAPHY FUNCTIONS
 # ==============================
-
-from PIL import Image
 
 def encode_image(image_path, secret_message, password, output_path):
     image = Image.open(image_path).convert("RGB")
@@ -505,6 +511,13 @@ def redirect_legacy_static_encoded():
         legacy_filename = request.path[len(legacy_prefix):]
         return redirect(url_for("serve_encoded", filename=legacy_filename), code=302)
 
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 @app.route("/encoded/<path:filename>")
 def serve_encoded(filename):
     return send_from_directory(app.config["ENCODED_FOLDER"], filename, as_attachment=False)
@@ -632,51 +645,20 @@ def share_email():
 
         if not recipient:
             return jsonify({"status": "error", "message": "Missing data"}), 400
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", recipient):
+            return jsonify({"status": "error", "message": "Invalid email address"}), 400
 
         safe_filename = secure_filename(filename or "")
 
         if not safe_filename:
             return jsonify({"status": "error", "message": "Missing image attachment"}), 400
 
-        job_id = uuid.uuid4().hex
-        _set_email_job_status(job_id, "queued", "Email queued for delivery.", current_user.id)
-
-        MAIL_SEND_EXECUTOR.submit(
-            send_share_email_job,
-            job_id,
-            recipient,
-            safe_filename,
-            current_user.id
-        )
-
-        return jsonify({
-            "status": "success",
-            "message": "Email queued for delivery",
-            "job_id": job_id
-        }), 202
+        send_share_email_job(recipient, safe_filename, current_user.id)
+        return jsonify({"status": "success", "message": "Email sent successfully."})
 
     except Exception as e:
         print("Mail Error:", e)
-        return jsonify({"status": "error", "message": "Server error"}), 500
-
-@app.route("/share-email-status/<job_id>", methods=["GET"])
-@login_required
-def share_email_status(job_id):
-    with EMAIL_JOBS_LOCK:
-        job = EMAIL_JOBS.get(job_id)
-
-    if not job:
-        return jsonify({"status": "error", "message": "Job not found"}), 404
-
-    if job.get("user_id") != current_user.id:
-        return jsonify({"status": "error", "message": "Unauthorized"}), 403
-
-    return jsonify({
-        "status": "success",
-        "delivery_status": job["status"],
-        "message": job["message"],
-        "updated_at": job["updated_at"]
-    })
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/logs")
 @login_required
@@ -703,6 +685,6 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("FLASK_DEBUG", "true").lower() == "true")
 
 

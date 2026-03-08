@@ -75,7 +75,7 @@
 <div id="successModal" class="modal">
     <div class="modal-content">
         <h3>Transmission Status</h3>
-        <p id="transmissionStatusText">Email sending......</p>
+        <p>Email sent successfully.</p>
 
         <button class="btn" onclick="closeSuccessModal()">
             OK
@@ -86,8 +86,6 @@
 <!-- ================= JAVASCRIPT ================= -->
 
 <script>
-let emailStatusPollTimer = null;
-
 function openEmailModal() {
     document.getElementById("emailModal").style.display = "flex";
 }
@@ -102,46 +100,6 @@ function openSuccessModal() {
 
 function closeSuccessModal() {
     document.getElementById("successModal").style.display = "none";
-    if (emailStatusPollTimer) {
-        clearTimeout(emailStatusPollTimer);
-        emailStatusPollTimer = null;
-    }
-}
-
-function setTransmissionStatus(text) {
-    const statusEl = document.getElementById("transmissionStatusText");
-    if (statusEl) {
-        statusEl.textContent = text;
-    }
-}
-
-function pollEmailStatus(jobId, attempt = 0) {
-    fetch(`/share-email-status/${jobId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== "success") {
-            setTransmissionStatus("Unable to fetch delivery status.");
-            emailStatusPollTimer = setTimeout(() => pollEmailStatus(jobId, attempt + 1), 2000);
-            return;
-        }
-
-        if (data.delivery_status === "sent") {
-            setTransmissionStatus("Email sent successfully.");
-            return;
-        }
-
-        if (data.delivery_status === "failed") {
-            setTransmissionStatus(data.message || "Email sending failed.");
-            return;
-        }
-
-        setTransmissionStatus("Email sending......");
-        emailStatusPollTimer = setTimeout(() => pollEmailStatus(jobId, attempt + 1), 2000);
-    })
-    .catch(() => {
-        setTransmissionStatus("Email sending......");
-        emailStatusPollTimer = setTimeout(() => pollEmailStatus(jobId, attempt + 1), 2000);
-    });
 }
 
 function showDownloadWarning() {
@@ -156,40 +114,28 @@ function showDownloadWarning() {
 document.getElementById("emailForm").addEventListener("submit", function(e) {
     e.preventDefault();
 
-    if (emailStatusPollTimer) {
-        clearTimeout(emailStatusPollTimer);
-        emailStatusPollTimer = null;
-    }
-
     let formData = new FormData(this);
 
     fetch("/share-email", {
         method: "POST",
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === "success") {
-            closeEmailModal();
-            setTransmissionStatus("Email sending......");
-            openSuccessModal();
-            if (data.job_id) {
-                pollEmailStatus(data.job_id);
-            } else {
-                setTransmissionStatus("Unable to verify delivery status.");
-            }
-        } else {
-            alert("Email failed: " + data.message);
+    .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== "success") {
+            throw new Error(payload.message || `HTTP ${response.status}`);
         }
+        closeEmailModal();
+        openSuccessModal();
     })
     .catch(error => {
-        alert("Server error occurred.");
-        console.error(error);
+        alert(error?.message || "Email sending failed.");
     });
 });
 
 </script>
 
 {% endblock %}
+
 
 
