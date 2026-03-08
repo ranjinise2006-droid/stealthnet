@@ -23,10 +23,17 @@ from email.message import EmailMessage
 from email.policy import SMTP
 import time
 import ssl
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        return False
 
 # ==============================
 # APP CONFIGURATION
 # ==============================
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "SUPER_SECRET_CLASSIFIED_KEY")
@@ -64,8 +71,8 @@ if CLOUDINARY_ENABLED:
 app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
 app.config['MAIL_PORT'] = int(os.environ.get("MAIL_PORT", "587"))
 app.config['MAIL_USE_TLS'] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
-app.config['MAIL_USERNAME'] = os.environ.get("MAIL_USERNAME", "stealthnet01@gmail.com")
-app.config['MAIL_PASSWORD'] = os.environ.get("MAIL_PASSWORD", "qxsuvfdsmlfroxka")
+app.config['MAIL_USERNAME'] = os.environ.get("MAIL_USERNAME", "")
+app.config['MAIL_PASSWORD'] = os.environ.get("MAIL_PASSWORD", "")
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get("MAIL_DEFAULT_SENDER", app.config['MAIL_USERNAME'])
 app.config['MAIL_TIMEOUT'] = int(os.environ.get("MAIL_TIMEOUT", "20"))
 EMAIL_SEND_TIMEOUT_SECONDS = int(os.environ.get("EMAIL_SEND_TIMEOUT_SECONDS", "20"))

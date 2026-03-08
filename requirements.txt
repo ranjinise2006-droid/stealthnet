@@ -8,3 +8,4 @@ Flask-Bcrypt
 gunicorn
 cryptography
 cloudinary
+python-dotenv
