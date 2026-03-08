@@ -158,6 +158,14 @@ def upload_encoded_image(file_path):
     )
     return result["secure_url"]
 
+def build_download_url(image_url, filename):
+    if not image_url:
+        return image_url
+    # For Cloudinary, force browser download with fl_attachment.
+    if "res.cloudinary.com" in image_url and "/upload/" in image_url:
+        return image_url.replace("/upload/", "/upload/fl_attachment/", 1)
+    return image_url
+
 def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, text_body, html_body, timeout_seconds):
     if EMAIL_PROVIDER == "resend":
         if not RESEND_API_KEY:
@@ -596,7 +604,8 @@ def embed():
             return render_template(
                 "generated.html",
                 image_file=output_filename,
-                image_url=image_url
+                image_url=image_url,
+                download_url=build_download_url(image_url, output_filename)
             )
 
     return render_template("embed.html")

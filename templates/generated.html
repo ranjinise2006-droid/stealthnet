@@ -16,7 +16,7 @@
     <br><br>
 
     <!-- DOWNLOAD -->
-    <a href="{{ display_url }}" download onclick="showDownloadWarning()">
+    <a href="{{ download_url or display_url }}" download onclick="showDownloadWarning()">
         <button class="btn">Download Image</button>
     </a>
 
@@ -83,6 +83,19 @@
     </div>
 </div>
 
+<!-- ================= ERROR MODAL ================= -->
+
+<div id="errorModal" class="modal">
+    <div class="modal-content">
+        <h3>Transmission Failed</h3>
+        <p id="errorMessageText">Something went wrong.</p>
+
+        <button class="btn" onclick="closeErrorModal()">
+            OK
+        </button>
+    </div>
+</div>
+
 <!-- ================= JAVASCRIPT ================= -->
 
 <script>
@@ -100,6 +113,15 @@ function openSuccessModal() {
 
 function closeSuccessModal() {
     document.getElementById("successModal").style.display = "none";
+}
+
+function openErrorModal(message) {
+    document.getElementById("errorMessageText").textContent = message || "Email sending failed.";
+    document.getElementById("errorModal").style.display = "flex";
+}
+
+function closeErrorModal() {
+    document.getElementById("errorModal").style.display = "none";
 }
 
 function showDownloadWarning() {
@@ -129,7 +151,7 @@ document.getElementById("emailForm").addEventListener("submit", function(e) {
         openSuccessModal();
     })
     .catch(error => {
-        alert(error?.message || "Email sending failed.");
+        openErrorModal(error?.message || "Email sending failed.");
     });
 });
 
