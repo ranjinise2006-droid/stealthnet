@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import hashes
 from werkzeug.middleware.proxy_fix import ProxyFix
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 import base64
 import os
 import re
@@ -44,9 +45,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "uploads")
 app.config["ENCODED_FOLDER"] = os.path.join(app.config["UPLOAD_FOLDER"], "encoded")
+app.config["COMPRESSED_FOLDER"] = os.path.join(app.config["UPLOAD_FOLDER"], "compressed")
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["ENCODED_FOLDER"], exist_ok=True)
+os.makedirs(app.config["COMPRESSED_FOLDER"], exist_ok=True)
 
 ADMIN_BOOTSTRAP_USERNAME = os.environ.get("ADMIN_BOOTSTRAP_USERNAME", "ranjini")
 ADMIN_BOOTSTRAP_PASSWORD = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ranjini!")
@@ -56,6 +59,8 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
 CLOUDINARY_FOLDER = os.environ.get("CLOUDINARY_FOLDER", "stealthnet")
+COMPRESS_TARGET_KB = int(os.environ.get("COMPRESS_TARGET_KB", "50"))
+COMPRESS_TARGET_BYTES = COMPRESS_TARGET_KB * 1024
 
 CLOUDINARY_ENABLED = all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET])
 
@@ -165,6 +170,78 @@ def build_download_url(image_url, filename):
     if "res.cloudinary.com" in image_url and "/upload/" in image_url:
         return image_url.replace("/upload/", "/upload/fl_attachment/", 1)
     return image_url
+
+def download_remote_file(remote_url, timeout_seconds=20):
+    req = Request(
+        remote_url,
+        headers={"User-Agent": "StealthNet/1.0"}
+    )
+    with urlopen(req, timeout=timeout_seconds) as resp:
+        return resp.read()
+
+def compress_image_with_cloudinary(file_path, target_bytes):
+    if not CLOUDINARY_ENABLED:
+        raise ValueError("Cloudinary is not configured")
+
+    upload_result = cloudinary.uploader.upload(
+        file_path,
+        folder=f"{CLOUDINARY_FOLDER}/compressor",
+        resource_type="image"
+    )
+    public_id = upload_result.get("public_id")
+    if not public_id:
+        raise ValueError("Cloudinary upload failed")
+
+    # Try progressively stronger compression until we reach target size.
+    variants = [
+        {"width": 1920, "quality": "auto:good"},
+        {"width": 1600, "quality": "auto:good"},
+        {"width": 1280, "quality": "auto:eco"},
+        {"width": 1024, "quality": "auto:eco"},
+        {"width": 900, "quality": 60},
+        {"width": 800, "quality": 55},
+        {"width": 720, "quality": 50},
+        {"width": 640, "quality": 45},
+        {"width": 560, "quality": 40},
+        {"width": 480, "quality": 35},
+    ]
+
+    best_match = None
+    for variant in variants:
+        transformed_url, _ = cloudinary.utils.cloudinary_url(
+            public_id,
+            secure=True,
+            resource_type="image",
+            type="upload",
+            transformation=[
+                {"crop": "limit", "width": variant["width"]},
+                {"fetch_format": "jpg", "quality": variant["quality"], "flags": "progressive"}
+            ]
+        )
+        file_bytes = download_remote_file(transformed_url)
+        current_size = len(file_bytes)
+
+        if best_match is None or current_size < best_match["size"]:
+            best_match = {
+                "bytes": file_bytes,
+                "size": current_size,
+                "url": transformed_url
+            }
+
+        if current_size <= target_bytes:
+            break
+
+    if not best_match:
+        raise ValueError("Could not generate compressed image")
+
+    source_stem = os.path.splitext(os.path.basename(file_path))[0]
+    output_filename = secure_filename(f"compressed_{int(time.time())}_{source_stem}.jpg")
+    output_path = os.path.join(app.config["COMPRESSED_FOLDER"], output_filename)
+
+    with open(output_path, "wb") as compressed_file:
+        compressed_file.write(best_match["bytes"])
+
+    return output_filename, best_match["url"], best_match["size"]
 
 def send_classified_email(recipient, safe_filename, msg_data, msg_content_type, text_body, html_body, timeout_seconds):
     if EMAIL_PROVIDER == "resend":
@@ -519,6 +596,45 @@ def login():
 def dashboard():
     return render_template("dashboard.html")
 
+@app.route("/compress-image", methods=["GET", "POST"])
+@login_required
+def compress_image():
+    if request.method == "POST":
+        image = request.files.get("image")
+
+        if not CLOUDINARY_ENABLED:
+            flash("Cloudinary is not configured. Add credentials to use compressor.")
+            return redirect(url_for("compress_image"))
+
+        if not image or not image.filename:
+            flash("Please select an image to compress.")
+            return redirect(url_for("compress_image"))
+
+        if not image.filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            flash("Only PNG, JPG, JPEG, and WEBP formats are allowed.")
+            return redirect(url_for("compress_image"))
+
+        source_filename = secure_filename(image.filename)
+        source_path = os.path.join(app.config["UPLOAD_FOLDER"], source_filename)
+        image.save(source_path)
+
+        try:
+            compressed_file, _, compressed_size = compress_image_with_cloudinary(source_path, COMPRESS_TARGET_BYTES)
+        except Exception as e:
+            print("Compression Error:", e)
+            flash("Compression failed. Please try another image.")
+            return redirect(url_for("compress_image"))
+
+        log_activity(current_user.id, "Compress Image")
+        flash(f"Image compressed to {compressed_size / 1024:.1f} KB. Continue with Hide Message.")
+        return redirect(url_for("embed", compressed_file=compressed_file))
+
+    return render_template(
+        "compress.html",
+        cloudinary_enabled=CLOUDINARY_ENABLED,
+        target_kb=COMPRESS_TARGET_KB
+    )
+
 @app.before_request
 def redirect_legacy_static_encoded():
     legacy_prefix = "/static/encoded/"
@@ -541,74 +657,78 @@ def serve_encoded(filename):
 @app.route("/embed", methods=["GET", "POST"])
 @login_required
 def embed():
+    compressed_file = secure_filename(request.values.get("compressed_file", "").strip())
+    compressed_path = os.path.join(app.config["COMPRESSED_FOLDER"], compressed_file) if compressed_file else ""
+    compressed_available = bool(compressed_file and os.path.exists(compressed_path))
+
     if request.method == "POST":
-        image = request.files["image"]
-        secret = request.form["secret"].strip()
-        password = request.form["password"].strip()
+        image = request.files.get("image")
+        secret = request.form.get("secret", "").strip()
+        password = request.form.get("password", "").strip()
+        redirect_target = url_for("embed", compressed_file=compressed_file) if compressed_available else url_for("embed")
 
         # Validate
-        if not image or not secret or not password:
+        if not secret or not password:
             flash("All fields are required.")
-            return redirect(url_for("embed"))
+            return redirect(redirect_target)
 
-        # Check allowed extensions
-        if not image.filename.lower().endswith((".png", ".jpg", ".jpeg")):
-            flash("Only PNG, JPG and JPEG formats are allowed.")
-            return redirect(url_for("embed"))
+        if image and image.filename:
+            if not image.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+                flash("Only PNG, JPG and JPEG formats are allowed.")
+                return redirect(redirect_target)
+            filename = secure_filename(image.filename)
+            temp_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            image.save(temp_path)
+        elif compressed_available:
+            filename = compressed_file
+            temp_path = compressed_path
+        else:
+            flash("Please upload an image first.")
+            return redirect(redirect_target)
 
         encrypted_secret = encrypt_message(secret, password)
 
-        if image:
-            # Save uploaded file
-            filename = secure_filename(image.filename)
+        # Convert ANY image to PNG (VERY IMPORTANT)
+        img = Image.open(temp_path).convert("RGB")
 
-            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+        png_filename = os.path.splitext(filename)[0] + ".png"
+        png_path = os.path.join(app.config["UPLOAD_FOLDER"], png_filename)
+        img.save(png_path, "PNG")
 
-            temp_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            image.save(temp_path)
+        # Create output filename
+        output_filename = "encoded_" + png_filename
 
-            # Convert ANY image to PNG (VERY IMPORTANT)
-            img = Image.open(temp_path).convert("RGB")
+        # Create output folder
+        output_folder = app.config["ENCODED_FOLDER"]
+        os.makedirs(output_folder, exist_ok=True)
 
-            png_filename = os.path.splitext(filename)[0] + ".png"
-            png_path = os.path.join(app.config["UPLOAD_FOLDER"], png_filename)
+        # Full output path
+        output_path = os.path.join(output_folder, output_filename)
 
-            img.save(png_path, "PNG")
+        # Encode image
+        encode_image(png_path, encrypted_secret, password, output_path)
 
-            # Create output filename
-            output_filename = "encoded_" + png_filename
+        image_url = url_for("serve_encoded", filename=output_filename)
+        if CLOUDINARY_ENABLED:
+            try:
+                image_url = upload_encoded_image(output_path)
+            except Exception as e:
+                print("Cloudinary Error:", e)
+                flash("Cloud upload failed. Using local copy.")
+        else:
+            flash("Cloudinary not configured. Using temporary local storage.")
 
-            # Create output folder
-            output_folder = app.config["ENCODED_FOLDER"]
-            os.makedirs(output_folder, exist_ok=True)
+        # Log activity
+        log_activity(current_user.id, "Embed Secret")
 
-            # Full output path
-            output_path = os.path.join(output_folder, output_filename)
+        return render_template(
+            "generated.html",
+            image_file=output_filename,
+            image_url=image_url,
+            download_url=build_download_url(image_url, output_filename)
+        )
 
-            # Encode image
-            encode_image(png_path, encrypted_secret, password, output_path)
-
-            image_url = url_for("serve_encoded", filename=output_filename)
-            if CLOUDINARY_ENABLED:
-                try:
-                    image_url = upload_encoded_image(output_path)
-                except Exception as e:
-                    print("Cloudinary Error:", e)
-                    flash("Cloud upload failed. Using local copy.")
-            else:
-                flash("Cloudinary not configured. Using temporary local storage.")
-
-            # Log activity
-            log_activity(current_user.id, "Embed Secret")
-
-            return render_template(
-                "generated.html",
-                image_file=output_filename,
-                image_url=image_url,
-                download_url=build_download_url(image_url, output_filename)
-            )
-
-    return render_template("embed.html")
+    return render_template("embed.html", compressed_file=compressed_file if compressed_available else "")
 # -------- EXTRACT --------
 @app.route('/extract', methods=['GET', 'POST'])
 @login_required

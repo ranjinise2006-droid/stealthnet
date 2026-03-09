@@ -314,4 +314,19 @@ a.btn:hover,
     text-align: center;    /* centers the button */
 }
 
+.status-message {
+    margin: 12px 0 18px;
+    padding: 10px 12px;
+    border: 1px solid #00ffee;
+    border-radius: 8px;
+    color: #00ffee;
+    background: rgba(0, 20, 40, 0.6);
+    font-size: 13px;
+}
+
+.status-message.warning {
+    border-color: #ff0040;
+    color: #ff6f95;
+}
+
 

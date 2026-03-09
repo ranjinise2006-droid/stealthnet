@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}STEALTHNET | Compress Image{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <h2>Cloudinary Image Compressor</h2>
+    <p class="subtitle">Optimize an image to under {{ target_kb }}KB, then continue to Hide Message</p>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="status-message">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
+    {% if not cloudinary_enabled %}
+      <div class="status-message warning">Cloudinary credentials are missing. Configure them in your environment first.</div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data">
+        <label>Select Image</label>
+        <input type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
+
+        <br></br>
+
+        <button type="submit" class="btn" {% if not cloudinary_enabled %}disabled{% endif %}>
+            Optimize to &lt; {{ target_kb }}KB
+        </button>
+    </form>
+</div>
+
+{% endblock %}

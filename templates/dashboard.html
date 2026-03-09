@@ -17,6 +17,13 @@
 </h1>
 
 <div class="dashboard-grid">
+    <a class="dashboard-link" href="{{ url_for('compress_image') }}">
+        <div class="dashboard-card">
+            <h3>Compress Image</h3>
+            <p>Optimize cover image to under 50KB</p>
+        </div>
+    </a>
+
     <a class="dashboard-link" href="{{ url_for('embed') }}">
         <div class="dashboard-card">
             <h3>Embed Secret</h3>

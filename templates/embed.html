@@ -6,40 +6,47 @@
 
 <div class="card">
 
-    <h2>🛰 Stealth Image Encoder</h2>
+    <h2>Stealth Image Encoder</h2>
     <p class="subtitle">Embed classified data inside an image</p>
 
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="status-message">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
     <form method="POST" enctype="multipart/form-data">
+        {% if compressed_file %}
+        <input type="hidden" name="compressed_file" value="{{ compressed_file }}">
+        <div class="status-message">Compressed image loaded. Continue directly with Hide Message.</div>
+        {% endif %}
 
-        <!-- Image Upload -->
         <label>Select Cover Image</label>
-        <input type="file" name="image" accept="image/*" required>
+        <input type="file" name="image" accept="image/*" {% if not compressed_file %}required{% endif %}>
 
-         <br></br>
+        <br></br>
 
-        <!-- Secret Message -->
         <label>Secret Message</label>
-        <textarea 
-            name="secret" 
+        <textarea
+            name="secret"
             placeholder="Enter confidential message..."
             rows="4"
             required></textarea>
 
-            <br></br>
+        <br></br>
 
-        <!-- Password -->
         <label>Extraction Password</label>
 
-<div class="password-wrapper">
-    <input
-        type="password"
-        name="password"
-        placeholder="Minimum 6 characters with special symbol"
-        required>
-    <span class="toggle-password" onclick="togglePassword(this)">👁</span>
-</div>
+        <div class="password-wrapper">
+            <input
+                type="password"
+                name="password"
+                placeholder="Minimum 6 characters with special symbol"
+                required>
+            <span class="toggle-password" onclick="togglePassword(this)">Show</span>
+        </div>
 
-  <br></br>
+        <br></br>
 
         <button type="submit" class="btn">
             Generate Secure Image
